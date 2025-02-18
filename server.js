@@ -6,6 +6,10 @@ require('dotenv').config();
 
 const app = express();
 
+// Import routes
+const blogRoutes = require('./routes/blogs');
+const chatRoutes = require('./routes/chat');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -32,15 +36,14 @@ async function connectDB() {
   }
 }
 
-// OpenAI Setup
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
 // Wake-up endpoint
 app.get('/wake-up', (req, res) => {
   res.json({ status: 'Server is awake' });
 });
+
+// Use routes
+app.use('/api/blogs', blogRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Start server only after DB connection
 const PORT = process.env.PORT || 5000;
