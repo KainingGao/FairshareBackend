@@ -120,4 +120,32 @@ router.get('/history/:threadId', async (req, res) => {
   }
 });
 
+// Get all threads
+router.get('/history/threads', async (req, res) => {
+    try {
+        await client.connect();
+        const database = client.db('fairshare');
+        const chats = database.collection('chats');
+        
+        // Find all documents and convert to array
+        const threads = await chats.find({}).toArray();
+        
+        if (threads.length > 0) {
+            // Return array of threads with their IDs
+            res.json(threads.map(thread => ({
+                threadId: thread.threadId,
+                createdAt: thread.createdAt,
+                messageCount: thread.messages.length
+            })));
+        } else {
+            res.status(404).json({ message: 'No threads found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    } finally {
+        await client.close();
+    }
+});
+
+
 module.exports = router;
