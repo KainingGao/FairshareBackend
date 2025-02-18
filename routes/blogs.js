@@ -1,64 +1,79 @@
-import express from 'express';
-import { Blog } from '../models/Blog.js';
-
+const express = require('express');
 const router = express.Router();
+const { MongoClient, ObjectId } = require('mongodb');
+require('dotenv').config();
+
+const uri = process.env.MONGODB_URI;
+const client = new MongoClient(uri);
 
 // Get all blogs
 router.get('/', async (req, res) => {
   try {
-    const blogs = await Blog.find().sort({ date: -1 });
-    res.json(blogs);
+    await client.connect();
+    const database = client.db('fairshare');
+    const blogs = database.collection('blogs');
+    const allBlogs = await blogs.find({}).toArray();
+    res.json(allBlogs);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
 // Create new blog
 router.post('/', async (req, res) => {
-  const blog = new Blog({
-    title: req.body.title,
-    excerpt: req.body.excerpt,
-    content: req.body.content,
-    category: req.body.category
-  });
-
   try {
-    const newBlog = await blog.save();
-    res.status(201).json(newBlog);
+    await client.connect();
+    const database = client.db('fairshare');
+    const blogs = database.collection('blogs');
+    const blog = {
+      title: req.body.title,
+      excerpt: req.body.excerpt,
+      content: req.body.content,
+      category: req.body.category,
+      date: new Date()
+    };
+    const result = await blogs.insertOne(blog);
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
 // Update blog
 router.put('/:id', async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
-    if (blog) {
-      Object.assign(blog, req.body);
-      const updatedBlog = await blog.save();
-      res.json(updatedBlog);
-    } else {
-      res.status(404).json({ message: 'Blog not found' });
-    }
+    await client.connect();
+    const database = client.db('fairshare');
+    const blogs = database.collection('blogs');
+    const result = await blogs.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: req.body }
+    );
+    res.json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
 // Delete blog
 router.delete('/:id', async (req, res) => {
   try {
-    const blog = await Blog.findById(req.params.id);
-    if (blog) {
-      await blog.deleteOne();
-      res.json({ message: 'Blog deleted' });
-    } else {
-      res.status(404).json({ message: 'Blog not found' });
-    }
+    await client.connect();
+    const database = client.db('fairshare');
+    const blogs = database.collection('blogs');
+    const result = await blogs.deleteOne({ _id: new ObjectId(req.params.id) });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
-export const blogRouter = router;
+module.exports = router;
