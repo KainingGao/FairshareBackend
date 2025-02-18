@@ -1,8 +1,12 @@
-import express from 'express';
-import OpenAI from 'openai';
-import { Chat } from '../models/Chat.js';
-
+const express = require('express');
 const router = express.Router();
+const OpenAI = require('openai');
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
+
+const uri = process.env.MONGODB_URI;
+const client = new MongoClient(uri);
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -11,11 +15,19 @@ const openai = new OpenAI({
 router.post('/thread', async (req, res) => {
   try {
     const thread = await openai.beta.threads.create();
-    const chat = new Chat({ threadId: thread.id });
-    await chat.save();
+    await client.connect();
+    const database = client.db('fairshare');
+    const chats = database.collection('chats');
+    await chats.insertOne({
+      threadId: thread.id,
+      messages: [],
+      createdAt: new Date()
+    });
     res.json({ threadId: thread.id });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
@@ -24,16 +36,23 @@ router.post('/message', async (req, res) => {
   const { threadId, message } = req.body;
 
   try {
-    // Save user message to database
-    const chat = await Chat.findOne({ threadId });
-    if (!chat) {
-      return res.status(404).json({ message: 'Thread not found' });
-    }
-
-    chat.messages.push({
-      role: 'user',
-      content: message
-    });
+    await client.connect();
+    const database = client.db('fairshare');
+    const chats = database.collection('chats');
+    
+    // Save user message
+    await chats.updateOne(
+      { threadId },
+      { 
+        $push: { 
+          messages: {
+            role: 'user',
+            content: message,
+            timestamp: new Date()
+          }
+        }
+      }
+    );
 
     // Send message to OpenAI
     await openai.beta.threads.messages.create(threadId, {
@@ -51,29 +70,44 @@ router.post('/message', async (req, res) => {
     while (runStatus.status !== 'completed') {
       await new Promise(resolve => setTimeout(resolve, 1000));
       runStatus = await openai.beta.threads.runs.retrieve(threadId, run.id);
+      if (runStatus.status === 'failed') {
+        throw new Error('Assistant run failed');
+      }
     }
 
     // Get the assistant's response
     const messages = await openai.beta.threads.messages.list(threadId);
     const assistantMessage = messages.data[0].content[0].text.value;
 
-    // Save assistant message to database
-    chat.messages.push({
-      role: 'assistant',
-      content: assistantMessage
-    });
-    await chat.save();
+    // Save assistant message
+    await chats.updateOne(
+      { threadId },
+      { 
+        $push: { 
+          messages: {
+            role: 'assistant',
+            content: assistantMessage,
+            timestamp: new Date()
+          }
+        }
+      }
+    );
 
     res.json({ message: assistantMessage });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
 // Get chat history
 router.get('/history/:threadId', async (req, res) => {
   try {
-    const chat = await Chat.findOne({ threadId: req.params.threadId });
+    await client.connect();
+    const database = client.db('fairshare');
+    const chats = database.collection('chats');
+    const chat = await chats.findOne({ threadId: req.params.threadId });
     if (chat) {
       res.json(chat.messages);
     } else {
@@ -81,7 +115,9 @@ router.get('/history/:threadId', async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
+  } finally {
+    await client.close();
   }
 });
 
-export const chatRouter = router;
+module.exports = router;
