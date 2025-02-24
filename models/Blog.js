@@ -1,3 +1,4 @@
+//C:\Users\kygao\Documents\FairshareBackend\models\Blog.js
 const blogSchema = new mongoose.Schema({
     title: { type: String, required: true },
     excerpt: { type: String, required: true },

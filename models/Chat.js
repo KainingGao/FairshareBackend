@@ -1,3 +1,4 @@
+//C:\Users\kygao\Documents\FairshareBackend\models\Chat.js
 const messageSchema = new mongoose.Schema({
     role: { type: String, required: true },
     content: { type: String, required: true },
