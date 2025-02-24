@@ -1,3 +1,4 @@
+// routes/contact.js
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
@@ -13,9 +14,14 @@ const transporter = nodemailer.createTransport({
   port: 465,
   secure: true,
   auth: {
-    user: process.env.EMAIL_USER, // admin@fairsharetaxbookkeepings.com
+    user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   }
+});
+
+// Test route
+router.get('/test', (req, res) => {
+  res.json({ message: 'Contact routes working' });
 });
 
 // Handle contact form submission

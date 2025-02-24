@@ -1,10 +1,8 @@
-//C:\Users\kygao\Documents\FairshareBackend\server.js
+// server.js
 const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const OpenAI = require('openai');
-const contactRoutes = require('./routes/contact');
-
 require('dotenv').config();
 
 const app = express();
@@ -12,11 +10,11 @@ const app = express();
 // Import routes
 const blogRoutes = require('./routes/blogs');
 const chatRoutes = require('./routes/chat');
+const contactRoutes = require('./routes/contact'); // Add this line
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/api/contact', contactRoutes);
 
 // MongoDB Setup
 const uri = process.env.MONGODB_URI;
@@ -48,7 +46,13 @@ app.get('/wake-up', (req, res) => {
 // Use routes
 app.use('/api/blogs', blogRoutes);
 app.use('/api/chat', chatRoutes);
-app.use()
+app.use('/api/contact', contactRoutes); // Add this line
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
 
 // Start server only after DB connection
 const PORT = process.env.PORT || 5000;
