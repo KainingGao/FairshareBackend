@@ -1,4 +1,3 @@
-//C:\Users\kygao\Documents\FairshareBackend\routes\chat.js
 const express = require('express');
 const router = express.Router();
 const OpenAI = require('openai');
@@ -12,28 +11,16 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Create helper function to handle errors consistently
+// Handle API error helper function
 const handleApiError = (error, res) => {
   console.error('API Error:', error);
-  
-  // Return the appropriate error status and message
   const status = error.status || 500;
   const message = error.message || 'An unknown error occurred';
-  
   res.status(status).json({
     error: true,
     message,
     details: error.response?.data || {}
   });
-};
-
-// Validate API key middleware for admin routes
-const validateApiKey = (req, res, next) => {
-  const apiKey = req.body.apiKey || req.query.apiKey;
-  if (!apiKey || apiKey !== process.env.BACKEND_KEY) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-  next();
 };
 
 // =========================================
@@ -181,7 +168,7 @@ router.get('/threads', async (req, res) => {
 // =========================================
 
 // Retrieve assistant details
-router.get('/assistant/:assistantId', validateApiKey, async (req, res) => {
+router.get('/assistant/:assistantId', async (req, res) => {
   try {
     const { assistantId } = req.params;
     
@@ -200,7 +187,7 @@ router.get('/assistant/:assistantId', validateApiKey, async (req, res) => {
 });
 
 // Modify assistant
-router.post('/assistant/:assistantId', validateApiKey, async (req, res) => {
+router.post('/assistant/:assistantId', async (req, res) => {
   try {
     const { assistantId } = req.params;
     
@@ -211,7 +198,6 @@ router.post('/assistant/:assistantId', validateApiKey, async (req, res) => {
     
     // Extract assistant parameters
     const updateParams = { ...req.body };
-    delete updateParams.apiKey; // Remove API key if present
     
     // Update the assistant
     const updatedAssistant = await openai.beta.assistants.update(
@@ -226,135 +212,22 @@ router.post('/assistant/:assistantId', validateApiKey, async (req, res) => {
 });
 
 // =========================================
-// ADMIN ROUTES (Hidden path with API key validation)
+// ADMIN ROUTES (Hidden path)
 // =========================================
 
-// Get all chats with full details for admin
-router.get('/admin/chats', validateApiKey, async (req, res) => {
+// Get all chats with full details for admin (no pagination)
+router.get('/xyzadmin/chats', async (req, res) => {
   try {
     await client.connect();
     const database = client.db('fairshare');
     const chats = database.collection('chats');
     
-    // Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    // Find all documents with pagination
-    const totalChats = await chats.countDocuments();
+    // Get all chats without pagination
     const chatList = await chats.find({})
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
       .toArray();
     
-    res.json({
-      data: chatList,
-      pagination: {
-        total: totalChats,
-        page,
-        limit,
-        pages: Math.ceil(totalChats / limit)
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  } finally {
-    await client.close();
-  }
-});
-
-// Get specific chat detail for admin
-router.get('/admin/chats/:id', validateApiKey, async (req, res) => {
-  try {
-    await client.connect();
-    const database = client.db('fairshare');
-    const chats = database.collection('chats');
-    
-    // First try to find by ObjectId
-    let chat;
-    try {
-      chat = await chats.findOne({ _id: new ObjectId(req.params.id) });
-    } catch (e) {
-      // If not ObjectId, try to find by threadId
-      chat = await chats.findOne({ threadId: req.params.id });
-    }
-    
-    if (chat) {
-      res.json(chat);
-    } else {
-      res.status(404).json({ message: 'Chat not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  } finally {
-    await client.close();
-  }
-});
-
-// Delete chat for admin
-router.delete('/admin/chats/:id', validateApiKey, async (req, res) => {
-  try {
-    await client.connect();
-    const database = client.db('fairshare');
-    const chats = database.collection('chats');
-    
-    // First try to delete by ObjectId
-    let result;
-    try {
-      result = await chats.deleteOne({ _id: new ObjectId(req.params.id) });
-    } catch (e) {
-      // If not ObjectId, try to delete by threadId
-      result = await chats.deleteOne({ threadId: req.params.id });
-    }
-    
-    if (result.deletedCount > 0) {
-      res.json({ message: 'Chat deleted successfully', result });
-    } else {
-      res.status(404).json({ message: 'Chat not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  } finally {
-    await client.close();
-  }
-});
-
-// Delete multiple chats for admin
-router.post('/admin/chats/delete-multiple', validateApiKey, async (req, res) => {
-  try {
-    const { ids } = req.body;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ message: 'Please provide valid chat IDs' });
-    }
-    
-    await client.connect();
-    const database = client.db('fairshare');
-    const chats = database.collection('chats');
-    
-    // Try to convert ids to ObjectIds, fallback to original id if not possible
-    const objectIds = ids.map(id => {
-      try {
-        return new ObjectId(id);
-      } catch (e) {
-        return id;
-      }
-    });
-    
-    // Delete by _id or threadId
-    const result = await chats.deleteMany({
-      $or: [
-        { _id: { $in: objectIds.filter(id => id instanceof ObjectId) } },
-        { threadId: { $in: ids.filter(id => typeof id === 'string') } }
-      ]
-    });
-    
-    res.json({ 
-      message: `${result.deletedCount} chats deleted successfully`,
-      deletedCount: result.deletedCount
-    });
+    res.json(chatList);
   } catch (error) {
     res.status(500).json({ message: error.message });
   } finally {
