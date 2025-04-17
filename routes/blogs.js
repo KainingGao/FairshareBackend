@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
     const database = client.db('fairshare');
     const blogs = database.collection('blogs');
     const allBlogs = await blogs.find({})
-      .sort({ date: -1 })
+      .sort({ rank: -1, date: -1 })  // Sort by rank (high to low), then by date (recent first)
       .toArray();
     res.json(allBlogs);
   } catch (error) {
@@ -49,6 +49,7 @@ router.post('/xyzadmin/posts', async (req, res) => {
       excerpt: req.body.excerpt || title.substring(0, 100) + '...',
       content,
       category,
+      rank: req.body.rank || 0,  // Add rank field with default 0
       date: new Date(),
       updatedAt: new Date(),
       published: req.body.published !== undefined ? req.body.published : true,

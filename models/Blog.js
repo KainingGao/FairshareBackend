@@ -1,6 +1,8 @@
 //C:\Users\kygao\Documents\FairshareBackend\models\Blog.js
 const mongoose = require('mongoose');
 
+const mongoose = require('mongoose');
+
 const blogSchema = new mongoose.Schema({
   title: { 
     type: String, 
@@ -29,6 +31,10 @@ const blogSchema = new mongoose.Schema({
   author: {
     type: String,
     default: 'Admin'
+  },
+  rank: {
+    type: Number,
+    default: 0  // Default rank is 0, higher numbers will be displayed first
   },
   tags: [String],
   date: { 
