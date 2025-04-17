@@ -16,9 +16,9 @@ router.get('/', async (req, res) => {
     await client.connect();
     const database = client.db('fairshare');
     const blogs = database.collection('blogs');
-    const allBlogs = await blogs.find({})
-      .sort({ rank: -1, date: -1 })  // Sort by rank (high to low), then by date (recent first)
-      .toArray();
+    // We'll return unsorted data and let the frontend handle sorting
+    // This gives more flexibility to the frontend
+    const allBlogs = await blogs.find({}).toArray();
     res.json(allBlogs);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -44,12 +44,19 @@ router.post('/xyzadmin/posts', async (req, res) => {
       return res.status(400).json({ message: 'Title, content, and category are required' });
     }
     
+    // Parse rank as integer, default to 0 if not provided or invalid
+    let rank = 0;
+    if (req.body.rank !== undefined) {
+      rank = parseInt(req.body.rank, 10);
+      if (isNaN(rank)) rank = 0;
+    }
+    
     const blog = {
       title,
       excerpt: req.body.excerpt || title.substring(0, 100) + '...',
       content,
       category,
-      rank: req.body.rank || 0,  // Add rank field with default 0
+      rank: rank,
       date: new Date(),
       updatedAt: new Date(),
       published: req.body.published !== undefined ? req.body.published : true,
